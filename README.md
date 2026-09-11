@@ -1,119 +1,161 @@
-# Riesgo de Concentración Comercial en América Latina: Detección y Forecasting de Cambios Estructurales
+🇬🇧 English | [🇪🇸 Español](README.es.md)
 
-## Estado del proyecto
-**Versión vigente: v2 (completa)** — universo de partners ampliado a socios
-globales (no solo LatAm) y datos extendidos a 2025. La versión anterior
-(`v1-regional-only`, ver tag en GitHub) medía diversificación solo dentro de
-la región, lo cual resultó ciego a dependencias extra-regionales masivas
-(ej. México-EE.UU.). Ver `CHANGELOG.md` para el detalle de cada versión y
-por qué cambió, y `reports/informe_v2_continuacion.pdf` para el informe
-completo de esta etapa (qué se agregó, resultados, y líneas de investigación
-futura).
+# Trade Concentration Risk in Latin America: Structural Change Detection and Forecasting
 
-> [1 línea, se escribe al final cuando ya sepamos el resultado real — ej. "3 de 10 países muestran señales tempranas de riesgo de concentración comercial creciente hacia 2026-2027"]
+## Project Status
+**Current version: v2 (complete)** — partner universe expanded to global
+partners (not just LatAm), data extended through 2025. The previous
+version (`v1-regional-only`, see the GitHub tag) measured diversification
+only within the region, which turned out to be blind to massive
+extra-regional dependencies (e.g., Mexico-US). See `CHANGELOG.md` for
+details on each version and why it changed.
 
-## El problema de negocio
-<!--
-NO empezar con "este proyecto analiza redes de comercio". Empezar con la pregunta
-que le importa a alguien que toma decisiones: un exportador, un analista de riesgo
-soberano, un inversionista regional.
+**Full documents:**
+- `reports/informe_completo.pdf` — base methodology (v1), in Spanish.
+- `reports/informe_v2_continuacion.pdf` — what was added in v2 and why, in Spanish.
+- `reports/articulo_sintesis_final.pdf` / `reports/article_summary_en.pdf` — short article-style summary, in Spanish and English.
 
-Placeholder de la pregunta ya definida:
-"¿Qué países de América Latina están entrando a una zona de riesgo elevado de
-concentración de socios comerciales en los próximos 12-24 meses, y dónde debería
-un exportador/inversionista regional priorizar monitoreo o diversificación?"
+> With data through 2025, 7 of 10 countries show a statistically robust structural break. Peru is the most critical case: high chronic risk (51% of its exports go to China) and a 99.7% probability of a recent-change alert.
 
-Aquí también va, en 2-3 líneas, el POR QUÉ importa esto ahora (contexto de
-guerra comercial/reconfiguración de bloques — sin etiquetar ideología de gobiernos).
--->
+## The Business Problem
 
-## La respuesta corta
-<!-- Se llena al final: ranking semáforo (verde/amarillo/rojo) de los 10 países,
-la gráfica principal, y 2-3 líneas de conclusión. Esto es lo único que el 80%
-de los lectores va a ver. -->
+Which Latin American countries are entering a zone of elevated
+trade-concentration risk over the next 12-24 months, and where should a
+regional exporter or investor prioritize monitoring or diversification?
 
-## Datos
-<!--
-- Fuente: UN Comtrade, exportaciones reportadas por el país exportador (mirror
-  statistics resuelto: se usa consistentemente el lado exportador)
-- Cobertura: [mensual o anual, según lo que confirme el pull] , 20XX-2025
-- Países: México, Brasil, Argentina, Colombia, Perú, Ecuador, Bolivia, Honduras,
-  Guatemala, Chile (Cuba y Venezuela excluidos por cobertura de reporte insuficiente
-  — documentar con evidencia del pull)
-- Nivel de agregación: TOTAL (todos los productos)
--->
+This matters now for two concrete reasons: (1) real, verifiable trade
+friction between countries in the region coinciding with recent political
+realignments (see `reports/article_summary_en.pdf`), and (2) several
+countries in the region elected new governments in 2025-2026, making it
+especially relevant to monitor whether trade structure is changing too.
 
-## Metodología
-### 1. Construcción de la red
-<!-- Red pesada y dirigida, nodo = país, edge = valor de exportación bilateral -->
+## The Short Answer
 
-### 2. Métricas de red y su evolución temporal
-<!-- Entropía de distribución de pesos, grado ponderado, densidad -->
+| Country | Chronic Risk | P(alert) |
+|---|---|---|
+| 🔴 Peru | High (51% to China) | 99.7% |
+| 🟠 Chile | Moderate | 95.9% |
+| 🟠 Brazil | Moderate | 92.5% |
+| 🟡 Honduras | High | 39.1% |
+| 🟡 Guatemala | High | 29.0% |
+| 🟢 Mexico | High (92.6% to US) | 0.03% — structural, not a new crisis |
+| 🟢 Colombia, Argentina, Ecuador, Bolivia | Low-Moderate | <2% |
 
-### 3. Detección de cambios estructurales
-<!-- sup-F (Quandt-Andrews) con p-value por bootstrap + CUSUM (Brown-Durbin-Evans,
-     via statsmodels) como confirmación secundaria. Corrección de Bonferroni
-     aplicada por comparaciones múltiples (10 países). -->
+See `data/processed/risk_dashboard_final.csv` for full detail, and Figure
+3 in `reports/informe_v2_continuacion.pdf` for the visual version.
 
-**Nota metodológica — DFA descartado:** se consideró Detrended Fluctuation
-Analysis como segunda línea de evidencia de cambio de régimen, pero se
-descartó. DFA requiere series de cientos/miles de puntos para que el
-exponente de escalamiento sea estable (uso típico: fisiología, finanzas de
-alta frecuencia); con ~22-25 observaciones anuales por país, el ajuste
-log-log no tiene suficientes escalas de ventana para ser confiable — el
-exponente resultante sería esencialmente ruido, no señal. Se prefirió no
-reportar un número sin sustento estadístico real sobre forzar la técnica
-por completitud aparente.
+## Data
 
-### 4. Forecasting probabilístico
-<!-- ARIMA/ETS vs modelo bayesiano estructural vs XGBoost, walk-forward validation,
-     intervalos de predicción. Baseline naive obligatorio. -->
+- **Source:** UN Comtrade, exports as reported by the exporting country
+  (mirror-statistics issue resolved by consistently using the exporter
+  side).
+- **Coverage:** annual, 2000-2025 (2025 incomplete for Honduras and Peru
+  due to publication lag).
+- **Countries (reporters):** Mexico, Brazil, Argentina, Colombia, Peru,
+  Ecuador, Bolivia, Honduras, Guatemala, Chile (Cuba and Venezuela
+  excluded due to insufficient reporting coverage).
+- **Partner universe:** the 10 countries on the list + United States,
+  China, Germany, Japan, South Korea (see `CHANGELOG.md`, v2).
+- **Aggregation level:** TOTAL (all products, not disaggregated by HS
+  code).
 
-### 5. Traducción a alerta de riesgo
-<!-- Clasificador entrenado (logística/random forest) con salida P(riesgo),
-     features = métricas de red rezagadas. Evaluado con precision/recall vs
-     backtesting histórico. -->
+## Methodology (summary)
 
-## Validación de robustez de la métrica central
-<!-- Prueba de bondad de ajuste (KS) sobre la distribución de pesos de la red
-     (power-law vs lognormal) — justifica por qué la entropía es interpretable -->
+1. **Network construction** — weighted, directed graph by year, node =
+   country, edge = bilateral export value.
+2. **Shannon entropy** — export-destination diversification by
+   country-year, normalized to [0,1].
+3. **Structural break detection** — sup-F (Quandt-Andrews) with
+   bootstrap-estimated p-values (2,000 simulations) + Bonferroni
+   correction for multiple comparisons, plus CUSUM as a secondary check.
+4. **Probabilistic forecasting** — naive, ETS, ARIMA, Bayesian
+   regression, XGBoost, compared under expanding-window walk-forward
+   validation. Metric: MAE + 80% prediction-interval coverage.
+5. **Translation to a risk alert** — probability via the best forecast's
+   predictive distribution (analogous to a Value-at-Risk calculation),
+   complemented by an absolute concentration-level indicator.
 
-## Resultados
-<!-- Por país: serie de entropía + quiebres detectados + forecast con intervalos
-     + probabilidad de alerta. Se llena al final. -->
+Full detail on every step (including discarded methods and why) is in
+`reports/informe_completo.pdf` and `reports/informe_v2_continuacion.pdf`
+(Spanish) and `reports/article_summary_en.pdf` (English summary).
 
-## Limpieza de datos: hallazgos y decisiones
-<!--
-UN Comtrade regresa el comercio desglosado simultáneamente en tres dimensiones
-adicionales, cada una con su propia fila de "total" más filas de desglose que
-suman a ese total. Sin filtrar las tres, el valor de comercio se duplica:
-    1. Modo de transporte (motCode): total vs. aéreo/marítimo/terrestre/etc.
-    2. Partner2 (partner2Code): total vs. desglose por socio consignatario/destino final.
-    3. Régimen aduanero (customsCode): total ('C00') vs. desglose por tipo de régimen.
-Se filtró consistentemente a la fila de total en las tres dimensiones para los
-10 países. Validado: cero duplicados residuales por (exportador, año, socio)
-en el dataset final.
--->
+**Methodological note — DFA discarded:** Detrended Fluctuation Analysis
+was considered as a second line of evidence for regime change, but was
+discarded. DFA requires series of hundreds/thousands of points for the
+scaling exponent to be stable; with ~22-26 annual observations per
+country, the log-log fit does not have enough window scales to be
+reliable.
 
-## Limitaciones (sección obligatoria, no opcional)
-<!--
-- N pequeño en series anuales (~25 puntos por país) — limita el poder de
-  forecasting con ML, documentar por qué se prioriza rigor de validación
-  sobre complejidad de modelo
-- Mirror statistics: se usa una sola dirección de reporte (exportador), no
-  reconciliación bilateral completa
-- Honduras: sin datos en 2008, 2013, 2022 — ausencia real, no se imputa
-- Cuba/Venezuela excluidos por cobertura de reporte insuficiente, no "riesgo cero"
-- Structural breaks estadísticamente significativos no implican causalidad
--->
+## Key Results
 
-## Referencias
-<!--
-- Alves et al. (2018), "Unfolding the Complexity of the Global Value Chain:
-  Strength and Entropy in the Single-Layer, Multiplex, and Multi-Layer
-  International Trade Networks", Entropy 20(12), 909.
-- [agregar los otros 2-3 papers relevantes conforme se citen en el cuerpo]
--->
+- **The regional blind spot:** Mexico appeared as the most diversified
+  country under a region-only metric (0.86) and turns out to be the most
+  concentrated under the global metric (0.16, 92.6% to the US).
+- **7 of 10 countries** show a robust structural break under Bonferroni
+  correction. A cluster in 2007-2009 (global financial crisis) + one
+  recent case (Colombia, 2022) worth watching, not confirmed as causal.
+- **Naive wins the forecasting comparison** in most countries — trade
+  entropy is near-persistent, and no sophisticated method should beat
+  persistence when there is no strong trend.
+- **XGBoost has only ~29.5% interval coverage** (target: 80%) — not
+  recommended for quantifying uncertainty in this project despite a
+  competitive MAE.
 
-## Cómo reproducir
-<!-- Instrucciones de setup, se llena al final -->
+## Data Cleaning: Findings and Decisions
+
+UN Comtrade returns trade broken down simultaneously along three
+additional dimensions, each with its own "total" row plus breakdown rows
+that sum to that total. Without filtering all three, the trade value gets
+double-counted:
+1. Mode of transport (`motCode`): total vs. air/sea/land/etc.
+2. Partner2 (`partner2Code`): total vs. breakdown by consignee/final
+   destination.
+3. Customs regime (`customsCode`): total (`C00`) vs. breakdown by regime
+   type.
+
+The total row was consistently filtered for all three dimensions across
+the 10 countries. Validated: zero residual duplicates by (exporter, year,
+partner) in the final dataset.
+
+## Limitations
+
+- Small N in annual series (~22-26 points per country) — limits the
+  power of ML-based forecasting; validation rigor is prioritized over
+  model complexity.
+- Mirror statistics: only one reporting direction (exporter) is used, no
+  full bilateral reconciliation.
+- Honduras: no data in 2008, 2013, 2022, 2025 — genuine absence, not
+  imputed. Peru also has no 2025 data published yet.
+- Cuba/Venezuela excluded due to insufficient reporting coverage, not
+  "zero risk."
+- Statistically significant structural breaks do not imply causality
+  about their origin (see the confounders discussion in
+  `reports/informe_v2_continuacion.pdf`).
+
+## References
+
+- Alves, L.G.A., Mangioni, G., Rodrigues, F.A., Panzarasa, P., & Moreno,
+  Y. (2018). Unfolding the Complexity of the Global Value Chain: Strength
+  and Entropy in the Single-Layer, Multiplex, and Multi-Layer
+  International Trade Networks. *Entropy*, 20(12), 909.
+- Andrews, D.W.K. (1993). Tests for Parameter Instability and Structural
+  Change with Unknown Change Point. *Econometrica*, 61(4), 821-856.
+- UN Comtrade Database, comtradeplus.un.org.
+
+## How to Reproduce
+
+```bash
+pip install -r requirements.txt
+export UN_COMTRADE_KEY="your_key_here"   # free at comtradeplus.un.org
+
+python src/fetch_data.py               # initial extraction, 2000-2024
+python src/fetch_data_update.py        # incremental, new years
+python src/process_data.py             # regional edge list
+python src/build_network.py            # regional entropy
+python src/build_network_global.py     # entropy + global partner universe
+python src/structural_breaks.py network_metrics_global.csv _global
+python src/forecasting.py network_metrics_global.csv _global
+python src/risk_alert.py network_metrics_global.csv forecast_walkforward_results_global.csv _global
+python src/risk_dashboard_final.py
+python src/make_report_figures_v2.py   # v2 report figures
+```
