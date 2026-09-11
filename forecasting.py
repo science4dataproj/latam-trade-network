@@ -32,7 +32,7 @@ import xgboost as xgb
 
 warnings.filterwarnings("ignore")
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
 METRICS_PATH = os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv")
 
 MIN_TRAIN = 15
