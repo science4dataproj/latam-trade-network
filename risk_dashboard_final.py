@@ -38,7 +38,7 @@ def chronic_tier(share: float) -> str:
 
 def main():
     comp = pd.read_csv(os.path.join(PROCESSED_DIR, "entropy_regional_vs_global.csv"))
-    alerts = pd.read_csv(os.path.join(PROCESSED_DIR, "risk_alert_from_forecast.csv"))
+    alerts = pd.read_csv(os.path.join(PROCESSED_DIR, "risk_alert_from_forecast_global.csv"))
 
     latest_comp = comp.sort_values("year").groupby("country").tail(1)
     latest_alert = alerts.sort_values("year").groupby("country").tail(1)

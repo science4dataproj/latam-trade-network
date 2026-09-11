@@ -52,7 +52,7 @@ REPORTERS = {
 }
 
 NEW_YEARS = [2025, 2026]
-RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
+RAW_DIR = os.path.join(os.path.dirname(__file__), "data", "raw")
 
 
 def fetch_reporter_year(reporter_code: int, year: int) -> pd.DataFrame:

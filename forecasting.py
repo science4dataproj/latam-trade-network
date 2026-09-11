@@ -22,6 +22,7 @@ calibración que separa un intervalo real de un adorno).
 """
 
 import os
+import sys
 import warnings
 import numpy as np
 import pandas as pd
@@ -33,7 +34,9 @@ import xgboost as xgb
 warnings.filterwarnings("ignore")
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
-METRICS_PATH = os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv")
+METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
+OUTPUT_SUFFIX = sys.argv[2] if len(sys.argv) > 2 else ""
+METRICS_PATH = os.path.join(PROCESSED_DIR, METRICS_FILENAME)
 
 MIN_TRAIN = 15
 Z_80 = 1.2816  # z-score para intervalo de 80%
@@ -176,7 +179,7 @@ if __name__ == "__main__":
     print("Corriendo walk-forward para los 10 países...\n")
     wf_all = run_all_countries(metrics)
 
-    out_path = os.path.join(PROCESSED_DIR, "forecast_walkforward_results.csv")
+    out_path = os.path.join(PROCESSED_DIR, f"forecast_walkforward_results{OUTPUT_SUFFIX}.csv")
     wf_all.to_csv(out_path, index=False)
     print(f"\nGuardado: {out_path} ({len(wf_all)} filas)")
 

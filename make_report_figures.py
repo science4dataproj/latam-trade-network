@@ -7,7 +7,7 @@ plt.rcParams.update({"font.size": 10, "figure.dpi": 150})
 
 PROCESSED = os.path.join(os.path.dirname(__file__), "data", "processed")
 print(PROCESSED)
-FIGDIR = os.path.join(os.path.dirname(__file__), "reports", "v1", "figures")
+FIGDIR = os.path.join(os.path.dirname(__file__), "reports", "v2", "figures")
 print(FIGDIR)
 os.makedirs(FIGDIR, exist_ok=True)
 

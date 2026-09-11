@@ -28,13 +28,16 @@ definitivos.
 """
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.stats.diagnostic import breaks_cusumolsresid
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
-METRICS_PATH = os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv")
+METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
+OUTPUT_SUFFIX = sys.argv[2] if len(sys.argv) > 2 else ""
+METRICS_PATH = os.path.join(PROCESSED_DIR, METRICS_FILENAME)
 
 TRIM = 0.15       # recorte estándar de Andrews (1993) en cada extremo
 N_BOOTSTRAP = 2000
@@ -140,7 +143,7 @@ def main():
             "significant_break_p05", "cusum_stat", "cusum_pvalue"]
     out = out[[c for c in cols if c in out.columns]]
 
-    out_path = os.path.join(PROCESSED_DIR, "structural_breaks_by_country.csv")
+    out_path = os.path.join(PROCESSED_DIR, f"structural_breaks_by_country{OUTPUT_SUFFIX}.csv")
     out.to_csv(out_path)
     print(out.to_string())
     print(f"\nGuardado: {out_path}")

@@ -87,7 +87,17 @@ def main():
 
     out_comp_path = os.path.join(PROCESSED_DIR, "entropy_regional_vs_global.csv")
     comparison.to_csv(out_comp_path, index=False)
-    print(f"Comparación guardada: {out_comp_path}\n")
+    print(f"Comparación guardada: {out_comp_path}")
+
+    # network_metrics_global.csv: mismo formato que network_metrics_by_country_year.csv
+    # (country, year, export_entropy, n_export_partners) para que structural_breaks.py,
+    # forecasting.py y risk_alert.py lo puedan leer sin cambios adicionales
+    metrics_global = entropy_global.rename(
+        columns={"export_entropy_global": "export_entropy", "n_export_partners_global": "n_export_partners"}
+    )[["country", "year", "export_entropy", "n_export_partners"]]
+    out_metrics_path = os.path.join(PROCESSED_DIR, "network_metrics_global.csv")
+    metrics_global.to_csv(out_metrics_path, index=False)
+    print(f"Métricas guardadas: {out_metrics_path}\n")
 
     print("Promedio 2000-2024, regional vs. global, y el socio dominante más reciente:")
     latest = comparison.sort_values("year").groupby("country").tail(1)

@@ -23,13 +23,17 @@ introducir un modelo nuevo sin señal.
 """
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
 PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
-METRICS_PATH = os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv")
-FORECAST_PATH = os.path.join(PROCESSED_DIR, "forecast_walkforward_results.csv")
+METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
+FORECAST_FILENAME = sys.argv[2] if len(sys.argv) > 2 else "forecast_walkforward_results.csv"
+OUTPUT_SUFFIX = sys.argv[3] if len(sys.argv) > 3 else ""
+METRICS_PATH = os.path.join(PROCESSED_DIR, METRICS_FILENAME)
+FORECAST_PATH = os.path.join(PROCESSED_DIR, FORECAST_FILENAME)
 
 MIN_HISTORY = 5
 Z_80 = 1.2816
@@ -99,7 +103,7 @@ if __name__ == "__main__":
     forecast_results = pd.read_csv(FORECAST_PATH)
 
     alerts = forecast_to_alert_probability(forecast_results, metrics)
-    out_path = os.path.join(PROCESSED_DIR, "risk_alert_from_forecast.csv")
+    out_path = os.path.join(PROCESSED_DIR, f"risk_alert_from_forecast{OUTPUT_SUFFIX}.csv")
     alerts.to_csv(out_path, index=False)
     print(f"Guardado: {out_path} ({len(alerts)} filas)\n")
 
