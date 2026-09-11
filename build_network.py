@@ -1,28 +1,29 @@
 """
-Construcción de la red de comercio LatAm (pesada, dirigida, por año) y
-cálculo de métricas de diversificación (entropía de Shannon) por país.
+Construction of the LatAm trade network (weighted, directed, by year) and
+calculation of diversification metrics (Shannon entropy) by country.
 
-Definiciones:
-    - Para cada año, se construye un grafo dirigido con los 10 países como
-      nodos y el valor de exportación bilateral (USD) como peso del edge.
-    - Como los 10 países son simultáneamente reporters, el edge list cubre
-      AMBAS direcciones entre cada par (A exporta a B y B exporta a A quedan
-      cada uno registrado por su propio reporte de exportación) — no hay que
-      inferir importaciones, ya están ahí como exportaciones del otro país.
+Definitions:
+    - For each year, a directed graph is built with the 10 countries as
+      nodes and bilateral export value (USD) as edge weight.
+    - Since all 10 countries are simultaneously reporters, the edge list
+      covers BOTH directions for each pair (A exports to B and B exports to
+      A are each recorded from their own export report) — imports do not
+      need to be inferred, they are already there as the other country's
+      exports.
 
-    - export_entropy(país, año): entropía de Shannon de la distribución de
-      DESTINOS de las exportaciones de ese país dentro de los otros 9.
-      Baja entropía = las exportaciones del país se concentran en pocos
-      destinos (mayor riesgo de concentración). Se normaliza dividiendo
-      entre log(9) para que el rango sea [0, 1] independiente del número
-      de socios activos ese año.
+    - export_entropy(country, year): Shannon entropy of the DESTINATION
+      distribution of that country's exports among the other 9. Low
+      entropy = the country's exports are concentrated in few destinations
+      (higher concentration risk). Normalized by dividing by log(9) so the
+      range is [0, 1] regardless of how many partners were active that
+      year.
 
-    - import_entropy(país, año): mismo cálculo pero sobre el ORIGEN de lo
-      que ese país importa desde los otros 9 (es decir, tomando los edges
-      donde ese país es el importer).
+    - import_entropy(country, year): same calculation but over the ORIGIN
+      of what that country imports from the other 9 (i.e., taking the
+      edges where that country is the importer).
 
-    - weighted_out_strength / weighted_in_strength: suma total de USD
-      exportados/importados hacia/desde los otros 9, por año.
+    - weighted_out_strength / weighted_in_strength: total USD
+      exported/imported to/from the other 9, per year.
 """
 
 import os
@@ -30,15 +31,15 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 EDGES_PATH = os.path.join(PROCESSED_DIR, "trade_edges_latam.csv")
 
 COUNTRIES = {"MEX", "BRA", "ARG", "COL", "PER", "ECU", "BOL", "HND", "GTM", "CHL"}
-MAX_ENTROPY = np.log(len(COUNTRIES) - 1)  # log(9), máxima diversificación posible
+MAX_ENTROPY = np.log(len(COUNTRIES) - 1)  # log(9), maximum possible diversification
 
 
 def shannon_entropy(weights: np.ndarray) -> float:
-    """Entropía de Shannon normalizada [0,1] de un vector de pesos no negativos."""
+    """Normalized [0,1] Shannon entropy of a vector of non-negative weights."""
     weights = weights[weights > 0]
     if len(weights) == 0:
         return np.nan
@@ -61,9 +62,9 @@ def compute_metrics(edges: pd.DataFrame) -> pd.DataFrame:
         G = build_year_graph(df_year)
 
         for country in COUNTRIES:
-            # Exportaciones: edges saliendo de este país
+            # Exports: edges leaving this country
             out_weights = df_year.loc[df_year["exporter"] == country, "value_usd"].values
-            # Importaciones: edges llegando a este país
+            # Imports: edges arriving at this country
             in_weights = df_year.loc[df_year["importer"] == country, "value_usd"].values
 
             records.append({
@@ -88,12 +89,12 @@ def main():
 
     out_path = os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv")
     metrics.to_csv(out_path, index=False)
-    print(f"Guardado: {out_path} ({len(metrics)} filas)")
+    print(f"Saved: {out_path} ({len(metrics)} rows)")
 
-    print("\nResumen de export_entropy (diversificación de destinos) por país, promedio 2000-2024:")
+    print("\nSummary of export_entropy (destination diversification) by country, 2000-2024 average:")
     print(metrics.groupby("country")["export_entropy"].mean().sort_values())
 
-    print("\nCobertura de filas por país (debería ser 25, o 22 para Honduras):")
+    print("\nRow coverage by country (should be 25, or 22 for Honduras):")
     print(metrics.groupby("country").size())
 
 

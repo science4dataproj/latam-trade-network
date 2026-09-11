@@ -1,27 +1,33 @@
 """
-Dashboard final: combina dos indicadores complementarios, no uno solo.
+Final dashboard: combines two complementary indicators, not just one.
 
-    - riesgo_cronico: nivel ABSOLUTO de concentración, basado en el % de
-      exportaciones que va al socio dominante (top_partner_share). No depende
-      de la historia propia del país -- es comparable entre países.
-      Umbrales: >50% Alto, 30-50% Moderado, <30% Bajo.
+    - riesgo_cronico ("chronic risk"): ABSOLUTE concentration level, based
+      on the % of exports going to the dominant partner (top_partner_share).
+      Does not depend on the country's own history -- comparable across
+      countries. Thresholds: >50% High, 30-50% Moderate, <30% Low.
 
-    - p_alert: probabilidad de que la entropía haya caído por debajo del
-      percentil 20 de la propia historia del país (paso 4c) -- detecta
-      CAMBIO reciente, no nivel absoluto.
+    - p_alert: probability that entropy has fallen below the country's own
+      20th historical percentile (step 4c) -- detects RECENT CHANGE, not
+      absolute level.
 
-Por qué los dos y no uno: ya vimos que México tiene el riesgo crónico más
-alto del grupo (92.6% de sus exportaciones a un solo país) pero casi cero
-probabilidad de alerta (porque esa dependencia es estructural, no un cambio
-reciente). Un solo indicador oculta la mitad de la historia en cualquier
-dirección -- un país puede estar sano en uno y en foco rojo en el otro, y
-esa combinación es información real, no ruido.
+Why both and not just one: we already saw that Mexico has the highest
+chronic risk in the group (92.6% of its exports to a single country) but
+near-zero alert probability (because that dependence is structural, not a
+recent change). A single indicator hides half the story in either
+direction -- a country can look healthy on one and be a red flag on the
+other, and that combination is real information, not noise.
+
+Note: DataFrame column names and category values (e.g. "riesgo_cronico",
+"Alto"/"Moderado"/"Bajo") are kept in Spanish to stay consistent with the
+already-generated processed CSVs and the figure-generation scripts that
+consume them (make_report_figures_v2.py). Only comments, docstrings, and
+console messages were translated to English.
 """
 
 import os
 import pandas as pd
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 
 COUNTRY_NAMES = {"MEX": "México", "BRA": "Brasil", "ARG": "Argentina", "COL": "Colombia",
                   "PER": "Perú", "ECU": "Ecuador", "BOL": "Bolivia", "HND": "Honduras",
@@ -54,12 +60,12 @@ def main():
     dash.to_csv(out_path, index=False)
 
     print(dash.to_string(index=False))
-    print(f"\nGuardado: {out_path}")
+    print(f"\nSaved: {out_path}")
 
-    print("\nCuadrantes:")
+    print("\nQuadrants:")
     for _, row in dash.iterrows():
-        cambio = "alerta reciente" if row["p_alert"] > 0.3 else "sin cambio reciente"
-        print(f"  {row['nombre']:12s}: riesgo crónico {row['riesgo_cronico']:9s} | {cambio} (p={row['p_alert']:.3f})")
+        change = "recent alert" if row["p_alert"] > 0.3 else "no recent change"
+        print(f"  {row['nombre']:12s}: chronic risk {row['riesgo_cronico']:9s} | {change} (p={row['p_alert']:.3f})")
 
 
 if __name__ == "__main__":

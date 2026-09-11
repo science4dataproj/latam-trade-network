@@ -1,21 +1,20 @@
 """
-Versión ampliada del universo de partners: en vez de restringir los destinos
-de exportación de cada país LatAm a los otros 9 de la región, se incluyen
-también los socios comerciales globales más relevantes (EE.UU., China,
-Alemania como ancla de la UE, Japón, Corea del Sur).
+Expanded partner-universe version: instead of restricting each LatAm
+country's export destinations to the other 9 in the region, the most
+relevant global trading partners are also included (USA, China, Germany as
+an EU anchor, Japan, South Korea).
 
-Por qué: la versión regional-only medía "qué tan diversificado está un país
-DENTRO de LatAm", lo cual es ciego a dependencias masivas fuera de la región
-(ej. México y EE.UU.). Esta versión corrige ese punto ciego para
+Why: the regional-only version measured "how diversified is a country
+WITHIN LatAm," which is blind to massive dependencies outside the region
+(e.g., Mexico and the US). This version corrects that blind spot for
 export_entropy.
 
-Limitación de alcance, documentada explícitamente: los 5 socios globales
-NUNCA fueron consultados como reporters (no se pidió su propio comercio),
-solo aparecen como partners en los reportes de exportación de los 10 países
-LatAm. Por lo tanto, esta corrección aplica a export_entropy (diversificación
-de DESTINOS), no a import_entropy (que seguiría limitado al universo
-regional, ya que no tenemos el reporte de exportación de EE.UU./China/etc.
-hacia LatAm).
+Explicitly documented scope limitation: the 5 global partners were NEVER
+queried as reporters (their own trade was not requested), they only appear
+as partners in the 10 LatAm countries' export reports. Therefore, this
+correction applies to export_entropy (DESTINATION diversification), not to
+import_entropy (which remains limited to the regional universe, since we
+do not have the US/China/etc. export reports toward LatAm).
 """
 
 import glob
@@ -23,8 +22,8 @@ import os
 import numpy as np
 import pandas as pd
 
-RAW_DIR = os.path.join(os.path.dirname(__file__), "data", "raw")
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 
 LATAM_ISO = {"MEX", "BRA", "ARG", "COL", "PER", "ECU", "BOL", "HND", "GTM", "CHL"}
 GLOBAL_PARTNERS_ISO = {"USA", "CHN", "DEU", "JPN", "KOR"}
@@ -61,9 +60,9 @@ def main():
     )
     out_edges_path = os.path.join(PROCESSED_DIR, "trade_edges_global_partners.csv")
     edges_global.to_csv(out_edges_path, index=False)
-    print(f"Edge list ampliado guardado: {out_edges_path} ({len(edges_global)} filas)")
+    print(f"Expanded edge list saved: {out_edges_path} ({len(edges_global)} rows)")
 
-    # export_entropy con universo ampliado, por país-año
+    # export_entropy with expanded universe, by country-year
     records = []
     for (country, year), df_cy in edges_global.groupby(["exporter", "year"]):
         weights = df_cy["value_usd"].values
@@ -77,7 +76,7 @@ def main():
         })
     entropy_global = pd.DataFrame(records).sort_values(["country", "year"])
 
-    # Comparar contra la versión regional-only ya calculada
+    # Compare against the already-computed regional-only version
     regional = pd.read_csv(os.path.join(PROCESSED_DIR, "network_metrics_by_country_year.csv"))
     comparison = entropy_global.merge(
         regional[["country", "year", "export_entropy"]].rename(columns={"export_entropy": "export_entropy_regional"}),
@@ -87,19 +86,19 @@ def main():
 
     out_comp_path = os.path.join(PROCESSED_DIR, "entropy_regional_vs_global.csv")
     comparison.to_csv(out_comp_path, index=False)
-    print(f"Comparación guardada: {out_comp_path}")
+    print(f"Comparison saved: {out_comp_path}")
 
-    # network_metrics_global.csv: mismo formato que network_metrics_by_country_year.csv
-    # (country, year, export_entropy, n_export_partners) para que structural_breaks.py,
-    # forecasting.py y risk_alert.py lo puedan leer sin cambios adicionales
+    # network_metrics_global.csv: same format as network_metrics_by_country_year.csv
+    # (country, year, export_entropy, n_export_partners) so structural_breaks.py,
+    # forecasting.py and risk_alert.py can read it without further changes
     metrics_global = entropy_global.rename(
         columns={"export_entropy_global": "export_entropy", "n_export_partners_global": "n_export_partners"}
     )[["country", "year", "export_entropy", "n_export_partners"]]
     out_metrics_path = os.path.join(PROCESSED_DIR, "network_metrics_global.csv")
     metrics_global.to_csv(out_metrics_path, index=False)
-    print(f"Métricas guardadas: {out_metrics_path}\n")
+    print(f"Metrics saved: {out_metrics_path}\n")
 
-    print("Promedio 2000-2024, regional vs. global, y el socio dominante más reciente:")
+    print("2000-2024 average, regional vs. global, and most recent dominant partner:")
     latest = comparison.sort_values("year").groupby("country").tail(1)
     avg = comparison.groupby("country")[["export_entropy_regional", "export_entropy_global", "gap"]].mean().round(3)
     avg["top_partner_2024"] = latest.set_index("country")["top_partner"]

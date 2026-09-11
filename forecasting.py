@@ -1,24 +1,24 @@
 """
-Forecasting probabilístico de export_entropy con walk-forward validation.
+Probabilistic forecasting of export_entropy with walk-forward validation.
 
-Métodos comparados:
-    - naive: último valor observado (baseline obligatorio)
+Methods compared:
+    - naive: last observed value (mandatory baseline)
     - ets: Holt linear trend (statsmodels ExponentialSmoothing)
-    - arima: SARIMAX con orden seleccionado por AIC sobre una grilla chica
-    - bayesian: Bayesian Ridge regression (sklearn) sobre [año, año^2] —
-      Bayesiano genuino (prior gaussiano sobre coeficientes, no solo el
-      nombre): da media posterior + desviación estándar predictiva, de ahí
-      el intervalo.
-    - xgboost: XGBoost sobre features de lags (lag1, lag2) + año. Con folds
-      iniciales de solo 12-15 puntos de entrenamiento, se espera que compita
-      mal contra los baselines simples — eso se reporta tal cual, no se
-      esconde ni se fuerza a que "gane".
+    - arima: SARIMAX with order selected by AIC over a small grid
+    - bayesian: Bayesian Ridge regression (sklearn) on [year, year^2] —
+      genuinely Bayesian (Gaussian prior on coefficients, not just the
+      name): gives a posterior mean + predictive standard deviation, hence
+      the interval.
+    - xgboost: XGBoost on lag features (lag1, lag2) + year. With initial
+      folds of only 12-15 training points, it is expected to compete
+      poorly against the simple baselines — that is reported as-is, not
+      hidden or forced to "win."
 
-Validación: walk-forward de ventana expansiva. min_train años de
-entrenamiento inicial, luego se pronostica 1 año adelante, se agrega el año
-real, se repite. Métrica: MAE y cobertura del intervalo de predicción al 80%
-(qué % de las veces el valor real cayó dentro del intervalo — el chequeo de
-calibración que separa un intervalo real de un adorno).
+Validation: expanding-window walk-forward. min_train initial training
+years, then forecast 1 year ahead, add the real year, repeat. Metric: MAE
+and 80% prediction-interval coverage (how often the real value fell inside
+the interval — the calibration check that separates a real interval from
+decoration).
 """
 
 import os
@@ -33,18 +33,18 @@ import xgboost as xgb
 
 warnings.filterwarnings("ignore")
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
 OUTPUT_SUFFIX = sys.argv[2] if len(sys.argv) > 2 else ""
 METRICS_PATH = os.path.join(PROCESSED_DIR, METRICS_FILENAME)
 
 MIN_TRAIN = 15
-Z_80 = 1.2816  # z-score para intervalo de 80%
+Z_80 = 1.2816  # z-score for an 80% interval
 
 
 def fit_predict_naive(y_train, t_train, t_pred):
     point = y_train[-1]
-    # PI basado en la desviación histórica de cambios año-a-año (naive walk)
+    # PI based on the historical deviation of year-over-year changes (naive walk)
     diffs = np.diff(y_train)
     sigma = np.std(diffs) if len(diffs) > 1 else 0.05
     return point, point - Z_80 * sigma, point + Z_80 * sigma
@@ -77,9 +77,9 @@ def fit_predict_arima(y_train, t_train, t_pred):
 
 
 def fit_predict_bayesian(y_train, t_train, t_pred):
-    # Estandarizar año (centrar y escalar) antes de construir features —
-    # sin esto, [t, t^2] con años crudos (~2015, ~4,060,225) mal condiciona
-    # la matriz de precisión de BayesianRidge y produce intervalos absurdos.
+    # Standardize year (center and scale) before building features — without
+    # this, [t, t^2] with raw years (~2015, ~4,060,225) badly conditions
+    # BayesianRidge's precision matrix and produces absurd intervals.
     t_mean, t_std = t_train.mean(), t_train.std()
     t_train_std = (t_train - t_mean) / t_std
     t_pred_std = (t_pred - t_mean) / t_std
@@ -106,7 +106,7 @@ def fit_predict_xgboost(y_train, t_train, t_pred):
     X_pred = np.array([[t_pred, y_train[-1], y_train[-2] if len(y_train) > 1 else y_train[-1]]])
     point = model.predict(X_pred)[0]
 
-    # PI aproximado por bootstrap de residuales in-sample (XGBoost no da incertidumbre nativa)
+    # Approximate PI via bootstrap of in-sample residuals (XGBoost gives no native uncertainty)
     resid = y_target - model.predict(X_train)
     sigma = np.std(resid) if len(resid) > 1 else 0.05
     return point, point - Z_80 * sigma, point + Z_80 * sigma
@@ -165,7 +165,7 @@ def run_all_countries(metrics: pd.DataFrame, min_train: int = MIN_TRAIN) -> pd.D
     for country, df_c in metrics.groupby("country"):
         n_valid = df_c["export_entropy"].notna().sum()
         if n_valid < min_train + 3:
-            print(f"{country}: solo {n_valid} observaciones válidas, se omite (mínimo {min_train + 3})")
+            print(f"{country}: only {n_valid} valid observations, skipping (minimum {min_train + 3})")
             continue
         wf = walk_forward(df_c, min_train=min_train)
         wf["country"] = country
@@ -176,14 +176,14 @@ def run_all_countries(metrics: pd.DataFrame, min_train: int = MIN_TRAIN) -> pd.D
 if __name__ == "__main__":
     metrics = pd.read_csv(METRICS_PATH)
 
-    print("Corriendo walk-forward para los 10 países...\n")
+    print("Running walk-forward for the 10 countries...\n")
     wf_all = run_all_countries(metrics)
 
     out_path = os.path.join(PROCESSED_DIR, f"forecast_walkforward_results{OUTPUT_SUFFIX}.csv")
     wf_all.to_csv(out_path, index=False)
-    print(f"\nGuardado: {out_path} ({len(wf_all)} filas)")
+    print(f"\nSaved: {out_path} ({len(wf_all)} rows)")
 
-    print("\nResumen global por método (todos los países juntos):")
+    print("\nGlobal summary by method (all countries pooled):")
     global_summary = wf_all.groupby("method").agg(
         n_folds=("abs_error", "count"),
         mae=("abs_error", "mean"),
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     ).round(4).sort_values("mae")
     print(global_summary)
 
-    print("\nMétodo con menor MAE por país:")
+    print("\nLowest-MAE method by country:")
     best_by_country = wf_all.groupby(["country", "method"])["abs_error"].mean().reset_index()
     winner = best_by_country.loc[best_by_country.groupby("country")["abs_error"].idxmin()]
     print(winner[["country", "method", "abs_error"]].sort_values("country").to_string(index=False))

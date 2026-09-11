@@ -1,30 +1,29 @@
 """
-Detección de quiebres estructurales en las series de export_entropy por país.
+Structural break detection in each country's export_entropy series.
 
-Método principal: sup-F de Quandt-Andrews.
-    - Se ajusta un modelo de tendencia lineal (entropía ~ constante + año) a
-      toda la serie.
-    - Para cada posible año de quiebre (recortando 15% en cada extremo, regla
-      estándar de Andrews 1993 para evitar quiebres en los bordes donde el
-      test pierde poder), se compara ese modelo único contra dos modelos de
-      tendencia separados (antes/después del quiebre), vía F-test.
-    - El año con el F-stat más alto es el candidato a quiebre estructural.
-    - Los valores críticos asintóticos del sup-F NO son una F estándar (es
-      un problema de comparaciones múltiples sobre el punto de quiebre
-      desconocido). En vez de usar tablas de Andrews (que asumen series más
-      largas), el p-value se estima por BOOTSTRAP: se simula bajo la
-      hipótesis nula de "no hay quiebre" (tendencia única + residuales
-      re-muestreados con reemplazo), se recalcula el sup-F en cada
-      simulación, y se compara el estadístico observado contra esa
-      distribución empírica.
+Primary method: Quandt-Andrews sup-F.
+    - A linear trend model (entropy ~ constant + year) is fit to the whole
+      series.
+    - For each candidate break year (trimming 15% at each end, Andrews'
+      1993 standard rule to avoid breaks at the edges where the test loses
+      power), that single model is compared against two separate trend
+      models (before/after the break) via an F-test.
+    - The year with the highest F-stat is the candidate structural break.
+    - The asymptotic critical values of sup-F are NOT a standard F (it is a
+      multiple-comparisons problem over an unknown break point). Instead of
+      using Andrews' tables (which assume longer series), the p-value is
+      estimated by BOOTSTRAP: simulate under the null hypothesis of "no
+      break" (single trend + residuals resampled with replacement),
+      recompute sup-F on each simulation, and compare the observed
+      statistic against that empirical distribution.
 
-Método secundario: CUSUM de residuales OLS (Brown-Durbin-Evans), vía
-statsmodels, como confirmación independiente de inestabilidad de parámetros.
+Secondary method: CUSUM of OLS residuals (Brown-Durbin-Evans), via
+statsmodels, as an independent confirmation of parameter instability.
 
-Nota metodológica importante (ver limitaciones en el README): con series de
-~22-25 observaciones anuales, el poder estadístico de estos tests es
-limitado. Se reportan los resultados con esa honestidad, no como hallazgos
-definitivos.
+Important methodological note (see limitations in the README): with series
+of ~22-25 annual observations, the statistical power of these tests is
+limited. Results are reported with that honesty, not as definitive
+findings.
 """
 
 import os
@@ -34,19 +33,19 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.stats.diagnostic import breaks_cusumolsresid
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
 OUTPUT_SUFFIX = sys.argv[2] if len(sys.argv) > 2 else ""
 METRICS_PATH = os.path.join(PROCESSED_DIR, METRICS_FILENAME)
 
-TRIM = 0.15       # recorte estándar de Andrews (1993) en cada extremo
+TRIM = 0.15       # Andrews' (1993) standard trim at each end
 N_BOOTSTRAP = 2000
-MIN_OBS = 15       # mínimo de observaciones no-nulas para correr el test
+MIN_OBS = 15       # minimum non-null observations required to run the test
 RANDOM_SEED = 42
 
 
 def sup_f_stat(y: np.ndarray, t: np.ndarray, trim: float = TRIM):
-    """Calcula el sup-F de Quandt-Andrews y el año (índice) donde ocurre."""
+    """Compute the Quandt-Andrews sup-F and the year (index) at which it occurs."""
     n = len(y)
     lo = int(np.floor(n * trim))
     hi = int(np.ceil(n * (1 - trim)))
@@ -57,7 +56,7 @@ def sup_f_stat(y: np.ndarray, t: np.ndarray, trim: float = TRIM):
 
     best_f, best_idx = -np.inf, None
     for i in range(lo, hi):
-        # Segmento 1 y 2, cada uno con su propia constante + tendencia
+        # Segment 1 and 2, each with its own constant + trend
         t1, y1 = t[:i], y[:i]
         t2, y2 = t[i:], y[i:]
         if len(t1) < 3 or len(t2) < 3:
@@ -66,7 +65,7 @@ def sup_f_stat(y: np.ndarray, t: np.ndarray, trim: float = TRIM):
         ssr2 = sm.OLS(y2, sm.add_constant(t2)).fit().ssr
         ssr_restricted = ssr1 + ssr2
 
-        # F-test: 2 parámetros extra (constante y pendiente del segundo segmento)
+        # F-test: 2 extra parameters (constant and slope of the second segment)
         k = 2
         f_stat = ((ssr_full - ssr_restricted) / k) / (ssr_restricted / (n - 2 * k))
         if f_stat > best_f:
@@ -77,8 +76,8 @@ def sup_f_stat(y: np.ndarray, t: np.ndarray, trim: float = TRIM):
 
 def bootstrap_pvalue(y: np.ndarray, t: np.ndarray, observed_f: float,
                       n_boot: int = N_BOOTSTRAP, seed: int = RANDOM_SEED) -> float:
-    """P-value empírico: bajo H0 (sin quiebre), ¿qué tan seguido el sup-F
-    simulado iguala o supera al observado?"""
+    """Empirical p-value: under H0 (no break), how often does the simulated
+    sup-F equal or exceed the observed one?"""
     rng = np.random.default_rng(seed)
     X_full = sm.add_constant(t)
     model_full = sm.OLS(y, X_full).fit()
@@ -109,7 +108,7 @@ def run_cusum(y: np.ndarray, t: np.ndarray):
 def analyze_country(df_country: pd.DataFrame):
     df_country = df_country.dropna(subset=["export_entropy"]).sort_values("year")
     if len(df_country) < MIN_OBS:
-        return {"n_obs": len(df_country), "status": "insuficientes observaciones"}
+        return {"n_obs": len(df_country), "status": "insufficient observations"}
 
     y = df_country["export_entropy"].values
     t = df_country["year"].values.astype(float)
@@ -146,7 +145,7 @@ def main():
     out_path = os.path.join(PROCESSED_DIR, f"structural_breaks_by_country{OUTPUT_SUFFIX}.csv")
     out.to_csv(out_path)
     print(out.to_string())
-    print(f"\nGuardado: {out_path}")
+    print(f"\nSaved: {out_path}")
 
 
 if __name__ == "__main__":

@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 
 plt.rcParams.update({"font.size": 10, "figure.dpi": 150})
 
-PROCESSED = os.path.join(os.path.dirname(__file__), "data", "processed")
-FIGDIR = os.path.join(os.path.dirname(__file__), "reports", "v2", "figures")
+PROCESSED = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
+FIGDIR = os.path.join(os.path.dirname(__file__), "..", "reports", "figures_v2")
 os.makedirs(FIGDIR, exist_ok=True)
 
 COUNTRY_NAMES = {"MEX":"México","BRA":"Brasil","ARG":"Argentina","COL":"Colombia","PER":"Perú",
@@ -15,7 +15,7 @@ comp = pd.read_csv(os.path.join(PROCESSED, "entropy_regional_vs_global.csv"))
 breaks_g = pd.read_csv(os.path.join(PROCESSED, "structural_breaks_by_country_global.csv"))
 dash = pd.read_csv(os.path.join(PROCESSED, "risk_dashboard_final.csv"))
 
-# --- Figura A: entropía regional vs. global, 2024 ---
+# --- Figure A: regional vs. global entropy, 2024 (plotted text stays in Spanish for the Spanish PDF) ---
 latest = comp.sort_values("year").groupby("country").tail(1).sort_values("export_entropy_global")
 fig, ax = plt.subplots(figsize=(8.5, 5))
 y = range(len(latest))
@@ -30,10 +30,7 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "figA_regional_vs_global.png"))
 plt.close(fig)
 
-# --- Figura B: sup-F global con significancia ---
-alpha_bonferroni = 0.05 / len(breaks_g)  # corrección por 10 tests independientes
-breaks_g["significant_bonferroni_p005"] = breaks_g["bootstrap_pvalue"] < alpha_bonferroni
-
+# --- Figure B: global sup-F with significance (plotted text stays in Spanish for the Spanish PDF) ---
 bs = breaks_g.sort_values("sup_f_stat")
 colors = ["#2ca02c" if sig else "#999999" for sig in bs["significant_bonferroni_p005"]]
 fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -46,7 +43,7 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "figB_structural_breaks_global.png"))
 plt.close(fig)
 
-# --- Figura C: dashboard de dos ejes, con etiquetas de país ---
+# --- Figure C: two-axis dashboard, with country labels (plotted text stays in Spanish for the Spanish PDF) ---
 fig, ax = plt.subplots(figsize=(7.5, 6))
 colors_tier = {"Alto": "#c0392b", "Moderado": "#e67e22", "Bajo": "#27ae60"}
 for _, row in dash.iterrows():
@@ -63,4 +60,4 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "figC_dashboard_final.png"))
 plt.close(fig)
 
-print("Figuras v2 generadas:", os.listdir(FIGDIR))
+print("v2 figures generated:", os.listdir(FIGDIR))  # note: chart text itself stays in Spanish, feeds the Spanish PDF

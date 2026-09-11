@@ -5,10 +5,8 @@ import matplotlib.pyplot as plt
 
 plt.rcParams.update({"font.size": 10, "figure.dpi": 150})
 
-PROCESSED = os.path.join(os.path.dirname(__file__), "data", "processed")
-print(PROCESSED)
-FIGDIR = os.path.join(os.path.dirname(__file__), "reports", "v2", "figures")
-print(FIGDIR)
+PROCESSED = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
+FIGDIR = os.path.join(os.path.dirname(__file__), "..", "reports", "figures")
 os.makedirs(FIGDIR, exist_ok=True)
 
 metrics = pd.read_csv(os.path.join(PROCESSED, "network_metrics_by_country_year.csv"))
@@ -19,7 +17,7 @@ alerts = pd.read_csv(os.path.join(PROCESSED, "risk_alert_from_forecast.csv"))
 COUNTRY_NAMES = {"MEX":"México","BRA":"Brasil","ARG":"Argentina","COL":"Colombia","PER":"Perú",
                  "ECU":"Ecuador","BOL":"Bolivia","HND":"Honduras","GTM":"Guatemala","CHL":"Chile"}
 
-# --- Figura 1: entropía por país, 2000-2024, con anotaciones de eventos reales ---
+# --- Figure 1: entropy by country, 2000-2024, with real-event annotations (plotted text stays in Spanish for the Spanish PDF) ---
 fig, ax = plt.subplots(figsize=(9, 5.5))
 for country, df_c in metrics.groupby("country"):
     df_c = df_c.sort_values("year")
@@ -40,23 +38,20 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "fig1_entropy_timeseries.png"))
 plt.close(fig)
 
-# --- Figura 2: sup-F stat por país con umbral de significancia ---
-alpha_bonferroni = 0.05 / len(breaks)  # corrección por 10 tests independientes
-breaks["significant_bonferroni_p005"] = breaks["bootstrap_pvalue"] < alpha_bonferroni
-
+# --- Figure 2: sup-F stat by country with significance threshold (plotted text stays in Spanish for the Spanish PDF) ---
 breaks_sorted = breaks.sort_values("sup_f_stat", ascending=True)
 colors = ["#2ca02c" if sig else "#999999" for sig in breaks_sorted["significant_bonferroni_p005"]]
 fig, ax = plt.subplots(figsize=(8, 4.5))
 bars = ax.barh(breaks_sorted["country"].map(COUNTRY_NAMES), breaks_sorted["sup_f_stat"], color=colors)
 ax.set_xlabel("Estadístico sup-F (Quandt-Andrews)")
-ax.set_title(f"Evidencia de quiebre estructural por país\n(verde = significativo bajo Bonferroni, p<{alpha_bonferroni:.4f})")
+ax.set_title("Evidencia de quiebre estructural por país\n(verde = significativo bajo Bonferroni, p<0.005)")
 for i, (f, yr) in enumerate(zip(breaks_sorted["sup_f_stat"], breaks_sorted["candidate_break_year"])):
     ax.text(f + 1, i, f"año candidato: {int(yr)}", va="center", fontsize=7, color="dimgray")
 fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "fig2_structural_breaks.png"))
 plt.close(fig)
 
-# --- Figura 3: forecast walk-forward, Colombia, naive vs bayesiano (mejor y peor método) ---
+# --- Figure 3: walk-forward forecast, Colombia, naive vs. bayesian (best and worst method) (plotted text stays in Spanish for the Spanish PDF) ---
 col = forecast[(forecast.country == "COL") & (forecast.method.isin(["naive", "bayesian"]))]
 actual = metrics[(metrics.country == "COL")].sort_values("year")
 fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -73,7 +68,7 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "fig3_forecast_colombia.png"))
 plt.close(fig)
 
-# --- Figura 4: ranking de riesgo actual (2024) ---
+# --- Figure 4: current risk ranking (2024) (plotted text stays in Spanish for the Spanish PDF) ---
 latest = alerts.sort_values("year").groupby("country").tail(1).sort_values("p_alert", ascending=True)
 colors4 = ["#d62728" if p > 0.3 else ("#ff7f0e" if p > 0.1 else "#2ca02c") for p in latest["p_alert"]]
 fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -84,5 +79,5 @@ fig.tight_layout()
 fig.savefig(os.path.join(FIGDIR, "fig4_risk_ranking_2024.png"))
 plt.close(fig)
 
-print("Figuras generadas en", FIGDIR)
+print("Figures generated in", FIGDIR)  # note: chart text itself stays in Spanish, feeds the Spanish PDF
 print(os.listdir(FIGDIR))

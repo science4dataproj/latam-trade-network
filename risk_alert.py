@@ -1,25 +1,24 @@
 """
-Traducción del forecast probabilístico (paso 4b) a probabilidad de alerta.
+Translation of the probabilistic forecast (step 4b) into an alert probability.
 
-Historial de diseño (documentado, no borrado): el enfoque inicial entrenaba
-un clasificador supervisado (Logistic Regression) sobre features rezagadas
-de entropía para predecir si el año siguiente cruzaría el percentil 20
-histórico del propio país. Resultado: ROC-AUC ≈ 0.49, PR-AUC apenas por
-encima de la tasa base — sin señal predictiva real, ni con features
-adicionales de momentum de 3 años. Conclusión: los lags cortos de entropía
-no predicen bien un cruce de umbral a un año, consistente con que los
-quiebres estructurales detectados (4a) operan en escalas multi-año, no
-año-a-año.
+Design history (documented, not deleted): the initial approach trained a
+supervised classifier (Logistic Regression) on lagged entropy features to
+predict whether the following year would cross the country's own 20th
+historical percentile. Result: ROC-AUC ~ 0.49, PR-AUC barely above the base
+rate -- no real predictive signal, even with an added 3-year momentum
+feature. Conclusion: short entropy lags do not predict a one-year-ahead
+threshold crossing well, consistent with the structural breaks detected in
+(4a) operating on multi-year scales, not year-to-year.
 
-Enfoque adoptado en su lugar: en vez de un clasificador nuevo, se usa la
-distribución predictiva que YA generó el mejor modelo de forecasting de cada
-país-año (media + desviación estándar del intervalo de predicción). La
-probabilidad de alerta es el área de esa distribución normal por debajo del
-umbral de riesgo (percentil 20 histórico expandido) -- el mismo cálculo que
-sustenta un Value-at-Risk: P(riesgo) = P(entropía_forecast < umbral).
+Approach adopted instead: rather than a new classifier, the predictive
+distribution ALREADY produced by each country-year's best forecasting model
+(mean + prediction-interval standard deviation) is used. The alert
+probability is the area of that normal distribution below the risk
+threshold (expanding historical 20th percentile) -- the same calculation
+underlying a Value-at-Risk: P(risk) = P(forecast_entropy < threshold).
 
-Esto reutiliza directamente la incertidumbre ya validada en 4b en vez de
-introducir un modelo nuevo sin señal.
+This directly reuses the uncertainty already validated in 4b instead of
+introducing a new model with no signal.
 """
 
 import os
@@ -28,7 +27,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "data", "processed")
+PROCESSED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
 METRICS_FILENAME = sys.argv[1] if len(sys.argv) > 1 else "network_metrics_by_country_year.csv"
 FORECAST_FILENAME = sys.argv[2] if len(sys.argv) > 2 else "forecast_walkforward_results.csv"
 OUTPUT_SUFFIX = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -40,7 +39,7 @@ Z_80 = 1.2816
 
 
 def historical_threshold(entropy_series: np.ndarray, upto_idx: int) -> float:
-    """Percentil 20 usando solo observaciones anteriores a upto_idx."""
+    """20th percentile using only observations prior to upto_idx."""
     past = entropy_series[:upto_idx]
     past_valid = past[~np.isnan(past)]
     if len(past_valid) < MIN_HISTORY:
@@ -49,8 +48,8 @@ def historical_threshold(entropy_series: np.ndarray, upto_idx: int) -> float:
 
 
 def forecast_to_alert_probability(forecast_results: pd.DataFrame, metrics: pd.DataFrame) -> pd.DataFrame:
-    # Reconstruir sigma implícito de cada predicción a partir del intervalo
-    # de 80% ya calculado en el forecast (pi_hi - pi_lo = 2 * Z_80 * sigma)
+    # Reconstruct each prediction's implied sigma from the 80% interval
+    # already computed in the forecast (pi_hi - pi_lo = 2 * Z_80 * sigma)
     fr = forecast_results.copy()
     fr["sigma_implied"] = (fr["pi_hi"] - fr["pi_lo"]) / (2 * Z_80)
 
@@ -69,9 +68,9 @@ def forecast_to_alert_probability(forecast_results: pd.DataFrame, metrics: pd.Da
             if fc_rows.empty:
                 continue
 
-            # Usar el método con menor MAE global de 4b como fuente de la
-            # probabilidad (naive) -- consistente con el hallazgo de que fue
-            # el mejor punto de forecast en la mayoría de los países
+            # Use the method with the lowest global MAE from 4b as the
+            # probability source (naive) -- consistent with the finding
+            # that it was the best forecast point for most countries
             best_row = fc_rows[fc_rows.method == "naive"]
             if best_row.empty:
                 continue
@@ -105,15 +104,15 @@ if __name__ == "__main__":
     alerts = forecast_to_alert_probability(forecast_results, metrics)
     out_path = os.path.join(PROCESSED_DIR, f"risk_alert_from_forecast{OUTPUT_SUFFIX}.csv")
     alerts.to_csv(out_path, index=False)
-    print(f"Guardado: {out_path} ({len(alerts)} filas)\n")
+    print(f"Saved: {out_path} ({len(alerts)} rows)\n")
 
-    # Evaluación simple: ¿los años con p_alert alto tuvieron más alertas reales?
+    # Simple evaluation: did years with high p_alert have more real alerts?
     alerts_valid = alerts.dropna(subset=["actual_alert"])
     from sklearn.metrics import roc_auc_score, average_precision_score
-    print("ROC-AUC (p_alert vs. alerta real):", roc_auc_score(alerts_valid.actual_alert, alerts_valid.p_alert))
+    print("ROC-AUC (p_alert vs. actual alert):", roc_auc_score(alerts_valid.actual_alert, alerts_valid.p_alert))
     print("PR-AUC:", average_precision_score(alerts_valid.actual_alert, alerts_valid.p_alert))
-    print("Tasa base:", alerts_valid.actual_alert.mean())
+    print("Base rate:", alerts_valid.actual_alert.mean())
 
-    print("\nÚltimo año disponible por país (situación actual):")
+    print("\nMost recent year available by country (current situation):")
     latest = alerts.sort_values("year").groupby("country").tail(1)
     print(latest[["country", "year", "forecast_mu", "p_alert"]].sort_values("p_alert", ascending=False).to_string(index=False))
