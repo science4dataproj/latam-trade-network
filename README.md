@@ -1,5 +1,15 @@
 # Riesgo de Concentración Comercial en América Latina: Detección y Forecasting de Cambios Estructurales
 
+## Estado del proyecto
+**Versión vigente: v2 (completa)** — universo de partners ampliado a socios
+globales (no solo LatAm) y datos extendidos a 2025. La versión anterior
+(`v1-regional-only`, ver tag en GitHub) medía diversificación solo dentro de
+la región, lo cual resultó ciego a dependencias extra-regionales masivas
+(ej. México-EE.UU.). Ver `CHANGELOG.md` para el detalle de cada versión y
+por qué cambió, y `reports/informe_v2_continuacion.pdf` para el informe
+completo de esta etapa (qué se agregó, resultados, y líneas de investigación
+futura).
+
 > [1 línea, se escribe al final cuando ya sepamos el resultado real — ej. "3 de 10 países muestran señales tempranas de riesgo de concentración comercial creciente hacia 2026-2027"]
 
 ## El problema de negocio
@@ -41,8 +51,19 @@ de los lectores va a ver. -->
 <!-- Entropía de distribución de pesos, grado ponderado, densidad -->
 
 ### 3. Detección de cambios estructurales
-<!-- Chow test / CUSUM sobre la serie de entropía + DFA como segunda línea de evidencia
-     (persistencia/antipersistencia) -->
+<!-- sup-F (Quandt-Andrews) con p-value por bootstrap + CUSUM (Brown-Durbin-Evans,
+     via statsmodels) como confirmación secundaria. Corrección de Bonferroni
+     aplicada por comparaciones múltiples (10 países). -->
+
+**Nota metodológica — DFA descartado:** se consideró Detrended Fluctuation
+Analysis como segunda línea de evidencia de cambio de régimen, pero se
+descartó. DFA requiere series de cientos/miles de puntos para que el
+exponente de escalamiento sea estable (uso típico: fisiología, finanzas de
+alta frecuencia); con ~22-25 observaciones anuales por país, el ajuste
+log-log no tiene suficientes escalas de ventana para ser confiable — el
+exponente resultante sería esencialmente ruido, no señal. Se prefirió no
+reportar un número sin sustento estadístico real sobre forzar la técnica
+por completitud aparente.
 
 ### 4. Forecasting probabilístico
 <!-- ARIMA/ETS vs modelo bayesiano estructural vs XGBoost, walk-forward validation,
