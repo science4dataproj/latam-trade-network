@@ -25,86 +25,82 @@ DISEÑO DE LA EXTRACCIÓN:
     - cada llamada se guarda cruda en data/raw/ sin transformar — cualquier limpieza
       o filtrado va en un script de procesamiento separado, no aquí.
 """
+"""
+Actualización incremental de datos: agrega años nuevos (2025, 2026) a los
+CSVs crudos existentes SIN volver a pedir 2000-2024 (ya los tenemos).
+
+Aviso de expectativas: el comercio internacional se publica con rezago.
+2025 puede venir incompleto o sujeto a revisión; 2026, a mitad de año, muy
+probablemente regrese vacío para varios o todos los países -- eso no es un
+error del script, es el rezago normal de publicación de Comtrade. Se
+reporta explícitamente qué llegó y qué no, no se asume nada.
+"""
 
 import os
 import time
 import pandas as pd
 import comtradeapicall
-import urllib3
 
-SUBSCRIPTION_KEY = os.environ.get("UN_COMTRADE_KEY")
+#SUBSCRIPTION_KEY = os.environ.get("UN_COMTRADE_KEY")
+SUBSCRIPTION_KEY = "98cc6300b3bc4130a854fb992a7d5b69"
 if not SUBSCRIPTION_KEY:
-    raise RuntimeError(
-        "Falta la variable de entorno UN_COMTRADE_KEY. "
-        "Ver instrucciones en el docstring de este archivo."
-    )
+    raise RuntimeError("Falta la variable de entorno UN_COMTRADE_KEY.")
 
-# Códigos M49 de los 10 países (Cuba y Venezuela excluidos por cobertura)
 REPORTERS = {
-    "Mexico": 484,
-    "Brazil": 76,
-    "Argentina": 32,
-    "Colombia": 170,
-    "Peru": 604,
-    "Ecuador": 218,
-    "Bolivia": 68,
-    "Honduras": 340,
-    "Guatemala": 320,
-    "Chile": 152,
+    "mexico": 484, "brazil": 76, "argentina": 32, "colombia": 170, "peru": 604,
+    "ecuador": 218, "bolivia": 68, "honduras": 340, "guatemala": 320, "chile": 152,
 }
 
-START_YEAR = 2000
-END_YEAR = 2024
-
-RAW_DIR = os.path.join(os.path.dirname(__file__),"data", "raw")
-os.makedirs(RAW_DIR, exist_ok=True)
+NEW_YEARS = [2025, 2026]
+RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
 
-def fetch_reporter_year(reporter_name: str, reporter_code: int, year: int) -> pd.DataFrame:
-    """Trae exportaciones TOTAL de un reporter hacia todos los partners, para un año."""
-    df = comtradeapicall.getFinalData(
-        SUBSCRIPTION_KEY,
-        typeCode="C",          # comercio de bienes (goods)
-        freqCode="A",          # anual
-        clCode="HS",
-        period=str(year),
-        reporterCode=str(reporter_code),
-        cmdCode="TOTAL",
-        flowCode="X",          # exportaciones
-        partnerCode=None,      # todos los partners; se filtra después
-        partner2Code=None,
-        customsCode=None,
-        motCode=None,
-        maxRecords=2500,
-        format_output="JSON",
-        countOnly=None,
-        includeDesc=True,
+def fetch_reporter_year(reporter_code: int, year: int) -> pd.DataFrame:
+    return comtradeapicall.getFinalData(
+        SUBSCRIPTION_KEY, typeCode="C", freqCode="A", clCode="HS", period=str(year),
+        reporterCode=str(reporter_code), cmdCode="TOTAL", flowCode="X",
+        partnerCode=None, partner2Code=None, customsCode=None, motCode=None,
+        maxRecords=2500, format_output="JSON", countOnly=None, includeDesc=True,
     )
-    return df
 
 
 def main():
+    summary = []
     for name, code in REPORTERS.items():
-        frames = []
-        for year in range(START_YEAR, END_YEAR + 1):
-            try:
-                df = fetch_reporter_year(name, code, year)
-                if df is not None and len(df) > 0:
-                    frames.append(df)
-                    print(f"{name} {year}: {len(df)} filas")
-                else:
-                    print(f"{name} {year}: sin datos")
-            except Exception as e:
-                print(f"{name} {year}: ERROR - {e}")
-            time.sleep(1)  # respetar rate limit
+        existing_path = os.path.join(RAW_DIR, f"{name}_exports_raw.csv")
+        if not os.path.exists(existing_path):
+            print(f"ADVERTENCIA: no existe {existing_path}, se omite {name}")
+            continue
 
-        if frames:
-            full = pd.concat(frames, ignore_index=True)
-            out_path = os.path.join(RAW_DIR, f"{name.lower()}_exports_raw.csv")
-            full.to_csv(out_path, index=False)
-            print(f"Guardado: {out_path} ({len(full)} filas totales)")
+        existing = pd.read_csv(existing_path, low_memory=False)
+        already_have_years = set(existing["refYear"].unique())
+
+        new_frames = []
+        for year in NEW_YEARS:
+            if year in already_have_years:
+                continue
+            try:
+                df = fetch_reporter_year(code, year)
+                n_rows = len(df) if df is not None else 0
+                summary.append({"country": name, "year": year, "rows": n_rows})
+                if df is not None and n_rows > 0:
+                    new_frames.append(df)
+                print(f"{name} {year}: {n_rows} filas")
+            except Exception as e:
+                summary.append({"country": name, "year": year, "rows": 0, "error": str(e)})
+                print(f"{name} {year}: ERROR - {e}")
+            time.sleep(1)
+
+        if new_frames:
+            combined = pd.concat([existing] + new_frames, ignore_index=True)
+            combined.to_csv(existing_path, index=False)
+            print(f"  Actualizado: {existing_path} ({len(combined)} filas totales)")
         else:
-            print(f"ADVERTENCIA: {name} no tuvo ningún dato en el rango {START_YEAR}-{END_YEAR}")
+            print(f"  Sin años nuevos con datos para {name}, archivo sin cambios")
+
+    print("\nResumen de disponibilidad de años nuevos:")
+    summary_df = pd.DataFrame(summary)
+    print(summary_df.to_string(index=False) if len(summary_df) else "Nada que reportar")
 
 
 if __name__ == "__main__":
