@@ -1,0 +1,130 @@
+"""
+INTENTO DESCARTADO -- se conserva por trazabilidad, no se usa en el pipeline final.
+
+Clasificador supervisado (Logistic Regression) sobre features rezagadas de
+entropia para predecir alerta a 1 año. Resultado: ROC-AUC ~ 0.49 (azar),
+PR-AUC apenas sobre la tasa base. Sin señal predictiva real.
+
+Reemplazado por src/risk_alert.py, que deriva la probabilidad de alerta
+directamente de la distribución predictiva del forecast (4b) en vez de
+entrenar un modelo nuevo sin señal. Ver docstring de risk_alert.py para el
+razonamiento completo.
+"""
+
+def build_labels_and_features(metrics: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for country, df_c in metrics.groupby("country"):
+        df_c = df_c.sort_values("year").reset_index(drop=True)
+        entropy = df_c["export_entropy"].values
+        years = df_c["year"].values
+        n_partners = df_c["n_export_partners"].values
+
+        for i in range(len(df_c)):
+            if pd.isna(entropy[i]):
+                continue
+
+            past = entropy[:i]
+            past_valid = past[~np.isnan(past)]
+            if len(past_valid) < MIN_HISTORY:
+                continue
+
+            threshold = np.percentile(past_valid, 20)
+            label = int(entropy[i] < threshold)
+
+            # Features rezagadas: requieren al menos lag1 y lag2 disponibles
+            if i < 2 or pd.isna(entropy[i - 1]) or pd.isna(entropy[i - 2]):
+                continue
+
+            # Pendiente de 3 años (momentum de mediano plazo, no solo el
+            # cambio del último año) -- consistente con que los quiebres
+            # estructurales detectados operan en escalas multi-año, no
+            # año-a-año
+            if i >= 3 and not pd.isna(entropy[i - 3]):
+                slope3 = (entropy[i - 1] - entropy[i - 3]) / 2
+            else:
+                slope3 = entropy[i - 1] - entropy[i - 2]  # fallback si no hay 3 lags
+
+            rows.append({
+                "country": country,
+                "year": years[i],
+                "label": label,
+                "entropy_lag1": entropy[i - 1],
+                "entropy_diff_lag1": entropy[i - 1] - entropy[i - 2],
+                "entropy_slope3": slope3,
+                "n_partners_lag1": n_partners[i - 1],
+            })
+
+    return pd.DataFrame(rows)
+
+
+def walk_forward_classifier(panel: pd.DataFrame, min_train_year: int = MIN_TRAIN_YEAR) -> pd.DataFrame:
+    feature_cols = ["entropy_lag1", "entropy_diff_lag1", "entropy_slope3", "n_partners_lag1"]
+    years = sorted(panel["year"].unique())
+    predict_years = [y for y in years if y >= min_train_year]
+
+    results = []
+    for test_year in predict_years:
+        train = panel[panel["year"] < test_year]
+        test = panel[panel["year"] == test_year]
+        if len(train) < 20 or test["label"].nunique() < 1 or train["label"].nunique() < 2:
+            continue
+
+        model = LogisticRegression(class_weight="balanced", max_iter=1000)
+        model.fit(train[feature_cols], train["label"])
+
+        proba = model.predict_proba(test[feature_cols])[:, 1]
+        pred = (proba >= 0.5).astype(int)
+
+        for j, (_, row) in enumerate(test.iterrows()):
+            results.append({
+                "year": test_year,
+                "country": row["country"],
+                "y_true": row["label"],
+                "y_proba": proba[j],
+                "y_pred": pred[j],
+            })
+
+    return pd.DataFrame(results)
+
+
+def evaluate(results: pd.DataFrame):
+    y_true, y_pred, y_proba = results["y_true"], results["y_pred"], results["y_proba"]
+
+    print(f"N predicciones evaluadas: {len(results)}")
+    print(f"Tasa base de alertas reales: {y_true.mean():.3f}")
+    print(f"Precision: {precision_score(y_true, y_pred, zero_division=0):.3f}")
+    print(f"Recall:    {recall_score(y_true, y_pred, zero_division=0):.3f}")
+    print(f"F1:        {f1_score(y_true, y_pred, zero_division=0):.3f}")
+    print("\nMatriz de confusión ([[TN,FP],[FN,TP]]):")
+    print(confusion_matrix(y_true, y_pred))
+
+    print("\nCalibración (bins de probabilidad predicha vs. frecuencia real):")
+    bins = pd.cut(y_proba, bins=[0, 0.2, 0.4, 0.6, 0.8, 1.0], include_lowest=True)
+    calib = results.groupby(bins, observed=True).agg(
+        n=("y_true", "count"),
+        prob_predicha_promedio=("y_proba", "mean"),
+        frecuencia_real=("y_true", "mean"),
+    )
+    print(calib.round(3))
+
+    print("\nErrores por país (falsos positivos + falsos negativos):")
+    results["error_type"] = np.where(
+        (results.y_true == 1) & (results.y_pred == 0), "falso_negativo",
+        np.where((results.y_true == 0) & (results.y_pred == 1), "falso_positivo", "correcto")
+    )
+    print(results.groupby(["country", "error_type"]).size().unstack(fill_value=0))
+
+
+if __name__ == "__main__":
+    metrics = pd.read_csv(METRICS_PATH)
+    panel = build_labels_and_features(metrics)
+
+    panel_path = os.path.join(PROCESSED_DIR, "risk_alert_panel.csv")
+    panel.to_csv(panel_path, index=False)
+    print(f"Panel guardado: {panel_path} ({len(panel)} filas, tasa base de alerta = {panel['label'].mean():.3f})\n")
+
+    results = walk_forward_classifier(panel)
+    results_path = os.path.join(PROCESSED_DIR, "risk_alert_walkforward_results.csv")
+    results.to_csv(results_path, index=False)
+
+    evaluate(results)
